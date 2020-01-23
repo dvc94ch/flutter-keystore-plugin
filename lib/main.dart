@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;
+import 'package:flutter_keystore_plugin/flutter_keystore_plugin.dart';
 
 void main() {
   // Override is necessary to prevent Unknown platform' flutter startup error.
   debugDefaultTargetPlatformOverride = TargetPlatform.android;
-  runApp(MyApp());
+  runApp(App());
 }
 
-class MyApp extends StatelessWidget {
+class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,55 +17,60 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: HomePage(FlutterKeystorePlugin()),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+class HomePage extends StatelessWidget {
 
-  final String title;
+  final FlutterKeystorePlugin keystore;
 
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
+  HomePage(this.keystore);
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  Future<dynamic> load() async {
+    final status = await keystore.status();
+    if (status == KeystoreStatus.Empty) {
+      await keystore.generate('password');
+    } else {
+      try {
+        await keystore.load('password');
+      } catch(e) {}
+    }
+    final phrase = await keystore.phrase('password');
+    final info = await keystore.info();
+    return info as dynamic;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.display1,
-              key: Key('counter'),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        key: Key('increment'),
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
+      appBar: AppBar(),
+      body: FutureBuilder(
+        future: load(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            final info = snapshot.data as KeyInfo;
+            print(info);
+            return Column(
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Texture(textureId: info.blocky),
+                ),
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Texture(textureId: info.qr),
+                ),
+                Text(info.ss58),
+              ],
+            );
+          } else {
+            return CircularProgressIndicator();
+          }
+        },
       ),
     );
   }
