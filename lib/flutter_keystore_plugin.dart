@@ -11,15 +11,21 @@ enum Status {
   Unlocked,
 }
 
-class KeyInfo {
+class Account {
+  final String name;
   final String ss58;
-  final int blocky;
-  final int qr;
+  final int identicon;
+  final int qrcode;
 
-  KeyInfo({@required this.ss58, @required this.blocky, @required this.qr});
+  Account({
+    @required this.name,
+    @required this.ss58,
+    @required this.identicon,
+    @required this.qrcode,
+  });
 
   String toString() {
-    return '<KeyInfo> { ss58: $ss58, blocky: $blocky, qr: $qr }';
+    return '<KeyInfo> { name: $name, ss58: $ss58, identicon: $identicon, qrcode: $qrcode }';
   }
 }
 
@@ -66,6 +72,14 @@ class FlutterKeystorePlugin {
     return channel.invokeMethod('lock');
   }
 
+  Future<bool> paperBackup() {
+    return channel.invokeMethod('paper_backup');
+  }
+
+  Future<Null> setPaperBackup() {
+    return channel.invokeMethod('set_paper_backup');
+  }
+
   Future<String> phrase(String password) {
     final Map<String, dynamic> args = {
       "password": password,
@@ -73,12 +87,13 @@ class FlutterKeystorePlugin {
     return channel.invokeMethod('phrase', args);
   }
 
-  Future<KeyInfo> info() async {
-    final info = await channel.invokeMethod('info');
-    return KeyInfo(
-      ss58: info['ss58'],
-      blocky: info['blocky'],
-      qr: info['qr'],
+  Future<Account> account() async {
+    final account = await channel.invokeMethod('account');
+    return Account(
+      name: account['name'],
+      ss58: account['ss58'],
+      identicon: account['identicon'],
+      qrcode: account['qrcode'],
     );
   }
 }

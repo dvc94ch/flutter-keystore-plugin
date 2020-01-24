@@ -41,35 +41,44 @@ impl MethodCallHandler for Handler {
             "generate" => {
                 let args = from_value::<PasswordArgs>(&call.args)?;
                 self.keystore.generate(&args.password)?;
-                return Ok(Value::Null);
+                Ok(Value::Null)
             }
             "import" => {
                 let args = from_value::<ImportArgs>(&call.args)?;
                 self.keystore.import(&args.phrase, &args.password)?;
-                return Ok(Value::Null);
+                Ok(Value::Null)
             }
             "unlock" => {
                 let args = from_value::<PasswordArgs>(&call.args)?;
                 self.keystore.unlock(&args.password)?;
-                return Ok(Value::Null);
+                Ok(Value::Null)
             }
             "lock" => {
                 self.keystore.lock();
-                return Ok(Value::Null);
+                Ok(Value::Null)
+            }
+            "paper_backup" => {
+                let paper_backup = self.keystore.paper_backup()?;
+                Ok(Value::Boolean(paper_backup))
+            }
+            "set_paper_backup" => {
+                self.keystore.set_paper_backup()?;
+                Ok(Value::Null)
             }
             "phrase" => {
                 let args = from_value::<PasswordArgs>(&call.args)?;
                 let phrase = self.keystore.phrase(&args.password)?;
-                return Ok(Value::String(phrase));
+                Ok(Value::String(phrase))
             }
-            "info" => {
+            "account" => {
                 let key = self.keystore.get_key(Some(0))?;
-                let blocky = engine.create_texture(key.blocky()?);
-                let qr = engine.create_texture(key.qr()?);
+                let identicon = engine.create_texture(key.identicon()?);
+                let qrcode = engine.create_texture(key.qrcode()?);
                 Ok(json_value!({
+                    "name": "/",
                     "ss58": key.ss58(),
-                    "blocky": blocky,
-                    "qr": qr,
+                    "identicon": identicon,
+                    "qrcode": qrcode,
                 }))
             }
             _ => Err(MethodCallError::NotImplemented),

@@ -109,15 +109,15 @@ fn keyfile_path() -> Result<PathBuf, Error> {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-struct EncryptedKey {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct KeyFile {
     mac: [u8; 16],
     nonce: [u8; 24],
     entropy: Vec<u8>,
-    confirmed: bool,
+    paper_backup: bool,
 }
 
-impl EncryptedKey {
+impl KeyFile {
     pub fn read_from(path: &Path) -> Result<Self, Error> {
         let file = File::open(path)?;
         Ok(serde_json::from_reader(file)?)
@@ -152,7 +152,7 @@ impl EncryptedKey {
             mac,
             nonce,
             entropy,
-            confirmed: false,
+            paper_backup: false,
         }
     }
 
@@ -175,6 +175,14 @@ impl EncryptedKey {
 
         Ok(entropy)
     }
+
+    pub fn paper_backup(&self) -> bool {
+        self.paper_backup
+    }
+
+    pub fn set_paper_backup(&mut self, paper_backup: bool) {
+        self.paper_backup = paper_backup;
+    }
 }
 
 pub enum Status {
@@ -184,7 +192,8 @@ pub enum Status {
 }
 
 pub struct Keystore {
-    keyfile: PathBuf,
+    path: PathBuf,
+    keyfile: Option<KeyFile>,
     keys: Vec<Pair>,
 }
 
@@ -199,9 +208,10 @@ impl Keystore {
         Ok(Self::from_keyfile(keyfile_path()?))
     }
 
-    pub fn from_keyfile(keyfile: PathBuf) -> Self {
+    pub fn from_keyfile(path: PathBuf) -> Self {
         Keystore {
-            keyfile,
+            path,
+            keyfile: None,
             keys: Default::default(),
         }
     }
@@ -210,7 +220,7 @@ impl Keystore {
         if self.keys.len() > 0 {
             return Status::Unlocked;
         }
-        if self.keyfile.exists() {
+        if self.path.exists() {
             Status::Locked
         } else {
             Status::Uninitialized
@@ -228,35 +238,44 @@ impl Keystore {
         Ok(())
     }
 
-    fn create_key(&mut self, mnemonic: &Mnemonic, password: &str) -> Result<(), Error> {
-        if self.keyfile.exists() {
+    fn create_key_file(
+        &mut self,
+        mnemonic: &Mnemonic,
+        password: &str,
+        paper_backup: bool,
+    ) -> Result<(), Error> {
+        if self.path.exists() {
             return Err(Error::KeyExists);
         }
 
-        let key = EncryptedKey::from_entropy(mnemonic.entropy(), password);
-        key.write_to(&self.keyfile)?;
+        let mut keyfile = KeyFile::from_entropy(mnemonic.entropy(), password);
+        keyfile.set_paper_backup(paper_backup);
+        keyfile.write_to(&self.path)?;
+        self.keyfile = Some(keyfile);
 
         Ok(())
     }
 
-    fn read_key(&self, password: &str) -> Result<Vec<u8>, Error> {
-        if !self.keyfile.exists() {
+    fn read_key_file(&mut self, password: &str) -> Result<Vec<u8>, Error> {
+        if !self.path.exists() {
             return Err(Error::KeyNotFound);
         }
 
-        EncryptedKey::read_from(&self.keyfile)?.into_entropy(password)
+        let keyfile = KeyFile::read_from(&self.path)?;
+        self.keyfile = Some(keyfile.clone());
+        Ok(keyfile.into_entropy(password)?)
     }
 
     pub fn generate(&mut self, password: &str) -> Result<(), Error> {
         let mnemonic = Mnemonic::new(MnemonicType::Words12, Language::English);
-        self.create_key(&mnemonic, password)?;
+        self.create_key_file(&mnemonic, password, false)?;
         self.add_key(mnemonic.entropy(), password)?;
         Ok(())
     }
 
     pub fn import(&mut self, phrase: &str, password: &str) -> Result<(), Error> {
         let mnemonic = Mnemonic::from_phrase(phrase, Language::English)?;
-        self.create_key(&mnemonic, password)?;
+        self.create_key_file(&mnemonic, password, true)?;
         self.add_key(mnemonic.entropy(), password)?;
         Ok(())
     }
@@ -265,7 +284,7 @@ impl Keystore {
         if self.keys.len() > 0 {
             return Ok(());
         }
-        let entropy = self.read_key(password)?;
+        let entropy = self.read_key_file(password)?;
         self.add_key(&entropy, password)?;
         Ok(())
     }
@@ -279,20 +298,41 @@ impl Keystore {
         self.keys.get(index).ok_or(Error::KeyNotFound)
     }
 
+    pub fn paper_backup(&self) -> Result<bool, Error> {
+        if let Some(keyfile) = &self.keyfile {
+            Ok(keyfile.paper_backup())
+        } else {
+            Err(Error::KeyNotFound)
+        }
+    }
+
+    pub fn set_paper_backup(&mut self) -> Result<(), Error> {
+        if let Some(keyfile) = &mut self.keyfile {
+            keyfile.set_paper_backup(true);
+            keyfile.write_to(&self.path)?;
+            Ok(())
+        } else {
+            Err(Error::KeyNotFound)
+        }
+    }
+
     pub fn phrase(&self, password: &str) -> Result<String, Error> {
-        let entropy = self.read_key(password)?;
-        Ok(Mnemonic::from_entropy(&entropy, Language::English)?
-            .phrase()
-            .to_owned())
+        if let Some(keyfile) = &self.keyfile {
+            let entropy = keyfile.clone().into_entropy(password)?;
+            let mnemonic = Mnemonic::from_entropy(&entropy, Language::English)?;
+            Ok(mnemonic.phrase().to_owned())
+        } else {
+            Err(Error::KeyNotFound)
+        }
     }
 }
 
 pub trait PairExt {
     fn ss58(&self) -> String;
 
-    fn blocky(&self) -> Result<RgbaImage, Error>;
+    fn identicon(&self) -> Result<RgbaImage, Error>;
 
-    fn qr(&self) -> Result<RgbaImage, Error>;
+    fn qrcode(&self) -> Result<RgbaImage, Error>;
 }
 
 impl PairExt for Pair {
@@ -300,7 +340,7 @@ impl PairExt for Pair {
         self.public().to_ss58check()
     }
 
-    fn blocky(&self) -> Result<RgbaImage, Error> {
+    fn identicon(&self) -> Result<RgbaImage, Error> {
         let blockies = Ethereum::default();
         let mut png = Vec::new();
         let public = self.public();
@@ -310,7 +350,7 @@ impl PairExt for Pair {
         Ok(img)
     }
 
-    fn qr(&self) -> Result<RgbaImage, Error> {
+    fn qrcode(&self) -> Result<RgbaImage, Error> {
         let public = self.public();
         let code = QrCode::new(public.as_slice())?;
         let img = code.render::<Rgba<u8>>().build();
@@ -326,19 +366,19 @@ mod tests {
     #[test]
     fn test_key_roundtrip() {
         let tmp = TempDir::new("keystore").unwrap();
-        let keyfile = tmp.path().join("keyfile");
-        let key = EncryptedKey::from_entropy(b"hello world", "password");
-        key.write_to(&keyfile).unwrap();
-        let new_key = EncryptedKey::read_from(&keyfile).unwrap();
-        let entropy = new_key.into_entropy("password").unwrap();
+        let path = tmp.path().join("keyfile");
+        let keyfile = KeyFile::from_entropy(b"hello world", "password");
+        keyfile.write_to(&path).unwrap();
+        let new_keyfile = KeyFile::read_from(&path).unwrap();
+        let entropy = new_keyfile.into_entropy("password").unwrap();
         assert_eq!(entropy, b"hello world");
     }
 
     #[test]
     fn test_import_phrase_roundtrip() {
         let tmp = TempDir::new("keystore").unwrap();
-        let keyfile = tmp.path().join("keyfile");
-        let mut keystore = Keystore::from_keyfile(keyfile);
+        let path = tmp.path().join("keyfile");
+        let mut keystore = Keystore::from_keyfile(path);
         let mnemonic = Mnemonic::new(MnemonicType::Words12, Language::English);
         keystore.import(mnemonic.phrase(), "password").unwrap();
         let phrase = keystore.phrase("password").unwrap();
@@ -346,24 +386,24 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_load_roundtrip() {
+    fn test_generate_unlock_roundtrip() {
         let tmp = TempDir::new("keystore").unwrap();
-        let keyfile = tmp.path().join("keyfile");
-        let mut keystore1 = Keystore::from_keyfile(keyfile.clone());
+        let path = tmp.path().join("keyfile");
+        let mut keystore1 = Keystore::from_keyfile(path.clone());
         keystore1.generate("password").unwrap();
-        let mut keystore2 = Keystore::from_keyfile(keyfile);
-        let res = keystore2.load("password");
+        let mut keystore2 = Keystore::from_keyfile(path);
+        let res = keystore2.unlock("password");
         assert!(res.is_ok());
     }
 
     #[test]
     fn test_password_missmatch() {
         let tmp = TempDir::new("keystore").unwrap();
-        let keyfile = tmp.path().join("keyfile");
-        let mut keystore1 = Keystore::from_keyfile(keyfile.clone());
+        let path = tmp.path().join("keyfile");
+        let mut keystore1 = Keystore::from_keyfile(path.clone());
         keystore1.generate("password").unwrap();
-        let mut keystore2 = Keystore::from_keyfile(keyfile);
-        let res = keystore2.load("wrong password");
+        let mut keystore2 = Keystore::from_keyfile(path);
+        let res = keystore2.unlock("wrong password");
         assert!(res.is_err());
     }
 }
