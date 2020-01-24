@@ -178,8 +178,9 @@ impl EncryptedKey {
 }
 
 pub enum Status {
-    Empty,
-    KeyFile,
+    Uninitialized,
+    Locked,
+    Unlocked,
 }
 
 pub struct Keystore {
@@ -206,10 +207,13 @@ impl Keystore {
     }
 
     pub fn status(&self) -> Status {
+        if self.keys.len() > 0 {
+            return Status::Unlocked;
+        }
         if self.keyfile.exists() {
-            Status::KeyFile
+            Status::Locked
         } else {
-            Status::Empty
+            Status::Uninitialized
         }
     }
 
@@ -257,10 +261,17 @@ impl Keystore {
         Ok(())
     }
 
-    pub fn load(&mut self, password: &str) -> Result<(), Error> {
+    pub fn unlock(&mut self, password: &str) -> Result<(), Error> {
+        if self.keys.len() > 0 {
+            return Ok(());
+        }
         let entropy = self.read_key(password)?;
         self.add_key(&entropy, password)?;
         Ok(())
+    }
+
+    pub fn lock(&mut self) {
+        self.keys.clear();
     }
 
     pub fn get_key(&self, key: Option<usize>) -> Result<&Pair, Error> {

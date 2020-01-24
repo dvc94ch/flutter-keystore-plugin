@@ -5,9 +5,10 @@ import 'dart:typed_data';
 import 'package:meta/meta.dart';
 import 'package:flutter/services.dart';
 
-enum KeystoreStatus {
-  Empty,
-  KeyFile
+enum Status {
+  Uninitialized,
+  Locked,
+  Unlocked,
 }
 
 class KeyInfo {
@@ -25,42 +26,49 @@ class KeyInfo {
 class FlutterKeystorePlugin {
   MethodChannel channel = MethodChannel('rust/keystore');
 
-  Future<KeystoreStatus> status() async {
+  Future<Status> status() async {
     final int status = await channel.invokeMethod('status');
     if (status == 0) {
-      return KeystoreStatus.Empty;
+      return Status.Uninitialized;
     }
-    if (status > 1) {
-      throw "Unknown status code";
+    if (status == 1) {
+      return Status.Locked;
     }
-    return KeystoreStatus.KeyFile;
+    if (status == 2) {
+      return Status.Unlocked;
+    }
+    throw "Unknown status code";
   }
 
   Future<Null> generate(String password) {
     final Map<String, dynamic> args = {
-      password: password,
+      "password": password,
     };
     return channel.invokeMethod('generate', args);
   }
 
   Future<Null> import(String phrase, String password) {
     final Map<String, dynamic> args = {
-      phrase: phrase,
-      password: password,
+      "phrase": phrase,
+      "password": password,
     };
     return channel.invokeMethod('import', args);
   }
 
-  Future<Null> load(String password) {
+  Future<Null> unlock(String password) {
     final Map<String, dynamic> args = {
-      password: password,
+      "password": password,
     };
-    return channel.invokeMethod('load', args);
+    return channel.invokeMethod('unlock', args);
+  }
+
+  Future<Null> lock() {
+    return channel.invokeMethod('lock');
   }
 
   Future<String> phrase(String password) {
     final Map<String, dynamic> args = {
-      password: password,
+      "password": password,
     };
     return channel.invokeMethod('phrase', args);
   }

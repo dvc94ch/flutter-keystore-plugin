@@ -34,8 +34,9 @@ impl MethodCallHandler for Handler {
     ) -> Result<Value, MethodCallError> {
         match call.method.as_str() {
             "status" => match self.keystore.status() {
-                Status::Empty => Ok(Value::I64(0)),
-                Status::KeyFile => Ok(Value::I64(1)),
+                Status::Uninitialized => Ok(Value::I64(0)),
+                Status::Locked => Ok(Value::I64(1)),
+                Status::Unlocked => Ok(Value::I64(2)),
             },
             "generate" => {
                 let args = from_value::<PasswordArgs>(&call.args)?;
@@ -47,9 +48,13 @@ impl MethodCallHandler for Handler {
                 self.keystore.import(&args.phrase, &args.password)?;
                 return Ok(Value::Null);
             }
-            "load" => {
+            "unlock" => {
                 let args = from_value::<PasswordArgs>(&call.args)?;
-                self.keystore.load(&args.password)?;
+                self.keystore.unlock(&args.password)?;
+                return Ok(Value::Null);
+            }
+            "lock" => {
+                self.keystore.lock();
                 return Ok(Value::Null);
             }
             "phrase" => {
@@ -78,13 +83,13 @@ impl MethodCallHandler for Handler {
     pub qr: i64,
 }*/
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PasswordArgs {
     pub password: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ImportArgs {
     pub phrase: String,
