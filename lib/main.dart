@@ -30,16 +30,16 @@ class HomePage extends StatelessWidget {
 
   Future<dynamic> load() async {
     final status = await keystore.status();
-    if (status == KeystoreStatus.Empty) {
+    if (status == Status.Uninitialized) {
       await keystore.generate('password');
     } else {
       try {
-        await keystore.load('password');
+        await keystore.unlock('password');
       } catch(e) {}
     }
     final phrase = await keystore.phrase('password');
-    final info = await keystore.info();
-    return info as dynamic;
+    final account = await keystore.account();
+    return account as dynamic;
   }
 
   @override
@@ -50,21 +50,21 @@ class HomePage extends StatelessWidget {
         future: load(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            final info = snapshot.data as KeyInfo;
-            print(info);
+            final account = snapshot.data as Account;
+            print(account);
             return Column(
               children: [
                 SizedBox(
                   width: 100,
                   height: 100,
-                  child: Texture(textureId: info.blocky),
+                  child: Texture(textureId: account.identicon),
                 ),
                 SizedBox(
                   width: 100,
                   height: 100,
-                  child: Texture(textureId: info.qr),
+                  child: Texture(textureId: account.qrcode),
                 ),
-                Text(info.ss58),
+                Text(account.ss58),
               ],
             );
           } else {
