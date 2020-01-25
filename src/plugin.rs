@@ -74,23 +74,27 @@ impl MethodCallHandler for Handler {
                 let key = self.keystore.get_key(Some(0))?;
                 let identicon = engine.create_texture(key.identicon()?);
                 let qrcode = engine.create_texture(key.qrcode()?);
-                Ok(json_value!({
-                    "name": "/",
-                    "ss58": key.ss58(),
-                    "identicon": identicon,
-                    "qrcode": qrcode,
-                }))
+                let account = Account {
+                    name: "/".to_string(),
+                    ss58: key.ss58(),
+                    identicon,
+                    qrcode,
+                };
+                Ok(to_value(account).expect("from known good value; qed"))
             }
             _ => Err(MethodCallError::NotImplemented),
         }
     }
 }
 
-/*struct KeyInfo {
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Account {
+    pub name: String,
     pub ss58: String,
-    pub blocky: i64,
-    pub qr: i64,
-}*/
+    pub identicon: i64,
+    pub qrcode: i64,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

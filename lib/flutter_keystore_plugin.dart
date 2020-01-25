@@ -25,7 +25,7 @@ class Account {
   });
 
   String toString() {
-    return '<KeyInfo> { name: $name, ss58: $ss58, identicon: $identicon, qrcode: $qrcode }';
+    return '<Account> { name: $name, ss58: $ss58, identicon: $identicon, qrcode: $qrcode }';
   }
 }
 
