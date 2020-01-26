@@ -22,20 +22,21 @@ env_logger = "0.7.1"
 glutin = { git = "https://github.com/dvc94ch/glutin", branch = "android" }
 
 [dependencies.flutter-engine]
-git = "https://github.com/dvc94ch/flutter-rs"
-branch = "texture-registry"
-features = ["texture-registry"]
+#git = "https://github.com/dvc94ch/flutter-rs"
+#branch = "texture-registry"
+features = ["image"]
+path = "../flutter-rs/flutter-engine"
 
 [dependencies.flutter-plugins]
-git = "https://github.com/dvc94ch/flutter-rs"
-branch = "texture-registry"
-#path = "../flutter-rs/flutter-plugins"
+#git = "https://github.com/dvc94ch/flutter-rs"
+#branch = "texture-registry"
+path = "../flutter-rs/flutter-plugins"
 
 [dependencies.flutter-winit]
 # bin deps
-git = "https://github.com/dvc94ch/flutter-rs"
-branch = "texture-registry"
-#path = "../flutter-rs/flutter-winit"
+#git = "https://github.com/dvc94ch/flutter-rs"
+#branch = "texture-registry"
+path = "../flutter-rs/flutter-winit"
 
 [dependencies.sp-core]
 version = "2.0.0"

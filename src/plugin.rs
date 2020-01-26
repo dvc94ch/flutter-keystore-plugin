@@ -1,5 +1,8 @@
 use crate::keystore::{Keystore, PairExt, Status};
+use flutter_engine::ffi::TextureId;
+use flutter_engine::texture_registry::{RgbaTexture, Texture};
 use flutter_plugins::prelude::*;
+use image::RgbaImage;
 use std::sync::Arc;
 
 const PLUGIN_NAME: &str = module_path!();
@@ -13,6 +16,16 @@ pub struct KeystorePlugin {
 #[derive(Default)]
 struct Handler {
     keystore: Keystore,
+    textures: Vec<Texture>,
+}
+
+impl Handler {
+    fn create_texture(&mut self, engine: &FlutterEngine, img: RgbaImage) -> TextureId {
+        let texture = engine.create_texture(RgbaTexture::new(img));
+        let id = texture.id();
+        self.textures.push(texture);
+        id
+    }
 }
 
 impl Plugin for KeystorePlugin {
@@ -72,11 +85,15 @@ impl MethodCallHandler for Handler {
             }
             "account" => {
                 let key = self.keystore.get_key(Some(0))?;
-                let identicon = engine.create_texture(key.identicon()?);
-                let qrcode = engine.create_texture(key.qrcode()?);
+                let ss58 = key.ss58();
+                let identicon = key.identicon()?;
+                let qrcode = key.qrcode()?;
+
+                let identicon = self.create_texture(&engine, identicon);
+                let qrcode = self.create_texture(&engine, qrcode);
                 let account = Account {
                     name: "/".to_string(),
-                    ss58: key.ss58(),
+                    ss58,
                     identicon,
                     qrcode,
                 };
