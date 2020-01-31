@@ -8,6 +8,9 @@ edition = "2018"
 blockies = "0.3.0"
 dirs = "2.0.2"
 failure = "0.1.6"
+flutter-engine = { git = "https://github.com/flutter-rs/flutter-rs", features = ["gl-helpers"] }
+flutter-plugins = { git = "https://github.com/flutter-rs/flutter-rs" }
+flutter-winit = { git = "https://github.com/flutter-rs/flutter-rs" }
 image = { version = "0.22.4", default-features = false, features = ["png_codec"] }
 log = "0.4.8"
 pixelate = "0.1.0"
@@ -15,32 +18,12 @@ qrcode = "0.11.2"
 rand = "0.7.3"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
+sp-core = { git = "https://github.com/paritytech/substrate" }
 strobe-rs = "0.5.2"
 tiny-bip39 = "0.7.0"
 # bin deps
 env_logger = "0.7.1"
 glutin = { git = "https://github.com/dvc94ch/glutin", branch = "android" }
-
-[dependencies.flutter-engine]
-#git = "https://github.com/dvc94ch/flutter-rs"
-#branch = "texture-registry"
-features = ["image"]
-path = "../flutter-rs/flutter-engine"
-
-[dependencies.flutter-plugins]
-#git = "https://github.com/dvc94ch/flutter-rs"
-#branch = "texture-registry"
-path = "../flutter-rs/flutter-plugins"
-
-[dependencies.flutter-winit]
-# bin deps
-#git = "https://github.com/dvc94ch/flutter-rs"
-#branch = "texture-registry"
-path = "../flutter-rs/flutter-winit"
-
-[dependencies.sp-core]
-version = "2.0.0"
-git = "https://github.com/paritytech/substrate"
 
 [dev-dependencies]
 tempdir = "0.3.7"

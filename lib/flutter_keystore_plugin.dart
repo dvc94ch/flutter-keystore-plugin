@@ -1,7 +1,6 @@
 library flutter_keystore_plugin;
 
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:meta/meta.dart';
 import 'package:flutter/services.dart';
 

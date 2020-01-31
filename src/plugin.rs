@@ -1,6 +1,5 @@
 use crate::keystore::{Keystore, PairExt, Status};
-use flutter_engine::ffi::TextureId;
-use flutter_engine::texture_registry::{RgbaTexture, Texture};
+use flutter_engine::texture_registry::{Texture, TextureId};
 use flutter_plugins::prelude::*;
 use image::RgbaImage;
 use std::sync::Arc;
@@ -21,8 +20,9 @@ struct Handler {
 
 impl Handler {
     fn create_texture(&mut self, engine: &FlutterEngine, img: RgbaImage) -> TextureId {
-        let texture = engine.create_texture(RgbaTexture::new(img));
+        let texture = engine.create_texture();
         let id = texture.id();
+        texture.post_frame_rgba(img);
         self.textures.push(texture);
         id
     }
