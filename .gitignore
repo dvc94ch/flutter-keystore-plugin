@@ -1,5 +1,5 @@
 /target
 **/*.rs.bk
-/build
-/.dart_tool
+build
+.dart_tool
 .packages
