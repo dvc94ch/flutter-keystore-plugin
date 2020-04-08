@@ -1,6 +1,5 @@
 use bip39::{Language, Mnemonic, MnemonicType};
 use blockies::Ethereum;
-use flutter_plugins::prelude::{MethodCallError, Value};
 use image::{ImageFormat, Rgba, RgbaImage};
 use qrcode::QrCode;
 use rand::rngs::OsRng;
@@ -91,16 +90,6 @@ impl From<image::ImageError> for Error {
     }
 }
 
-impl From<Error> for MethodCallError {
-    fn from(error: Error) -> Self {
-        MethodCallError::CustomError {
-            code: "200".to_owned(),
-            message: format!("{}", error),
-            details: Value::Null,
-        }
-    }
-}
-
 fn keyfile_path() -> Result<PathBuf, Error> {
     if let Some(dir) = dirs::config_dir() {
         Ok(dir.join("flutter-keystore-plugin").join("keyfile"))
@@ -126,6 +115,12 @@ impl KeyFile {
     pub fn write_to(&self, path: &Path) -> Result<(), Error> {
         std::fs::create_dir_all(path.parent().unwrap())?;
         let file = File::create(path)?;
+        #[cfg(unix)]
+        {
+            use std::fs::Permissions;
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(Permissions::from_mode(0o600))?;
+        }
         Ok(serde_json::to_writer(file, self)?)
     }
 
@@ -199,16 +194,12 @@ pub struct Keystore {
 
 impl Default for Keystore {
     fn default() -> Self {
-        Self::new().unwrap()
+        Self::new(keyfile_path().unwrap())
     }
 }
 
 impl Keystore {
-    pub fn new() -> Result<Self, Error> {
-        Ok(Self::from_keyfile(keyfile_path()?))
-    }
-
-    pub fn from_keyfile(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         Keystore {
             path,
             keyfile: None,
@@ -378,7 +369,7 @@ mod tests {
     fn test_import_phrase_roundtrip() {
         let tmp = TempDir::new("keystore").unwrap();
         let path = tmp.path().join("keyfile");
-        let mut keystore = Keystore::from_keyfile(path);
+        let mut keystore = Keystore::new(path);
         let mnemonic = Mnemonic::new(MnemonicType::Words12, Language::English);
         keystore.import(mnemonic.phrase(), "password").unwrap();
         let phrase = keystore.phrase("password").unwrap();
@@ -389,9 +380,9 @@ mod tests {
     fn test_generate_unlock_roundtrip() {
         let tmp = TempDir::new("keystore").unwrap();
         let path = tmp.path().join("keyfile");
-        let mut keystore1 = Keystore::from_keyfile(path.clone());
+        let mut keystore1 = Keystore::new(path.clone());
         keystore1.generate("password").unwrap();
-        let mut keystore2 = Keystore::from_keyfile(path);
+        let mut keystore2 = Keystore::new(path);
         let res = keystore2.unlock("password");
         assert!(res.is_ok());
     }
@@ -400,9 +391,9 @@ mod tests {
     fn test_password_missmatch() {
         let tmp = TempDir::new("keystore").unwrap();
         let path = tmp.path().join("keyfile");
-        let mut keystore1 = Keystore::from_keyfile(path.clone());
+        let mut keystore1 = Keystore::new(path.clone());
         keystore1.generate("password").unwrap();
-        let mut keystore2 = Keystore::from_keyfile(path);
+        let mut keystore2 = Keystore::new(path);
         let res = keystore2.unlock("wrong password");
         assert!(res.is_err());
     }
